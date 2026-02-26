@@ -3,11 +3,23 @@ import { pipeline } from 'stream/promises';
 import { createWriteStream } from 'fs';
 import fs from 'fs';
 import os from 'os';
+import path from 'path';
 import db from '../db.js';
 
 export const transcribeRouter = Router();
 
 const GPU_SERVER = process.env.GPU_SERVER;
+
+// Map content types to file extensions and MIME types
+const AUDIO_TYPES = {
+  'audio/mpeg': { ext: '.mp3', mime: 'audio/mpeg' },
+  'audio/mp3': { ext: '.mp3', mime: 'audio/mpeg' },
+  'audio/mp4': { ext: '.m4a', mime: 'audio/mp4' },
+  'audio/x-m4a': { ext: '.m4a', mime: 'audio/mp4' },
+  'audio/aac': { ext: '.aac', mime: 'audio/aac' },
+  'audio/ogg': { ext: '.ogg', mime: 'audio/ogg' },
+  'audio/wav': { ext: '.wav', mime: 'audio/wav' },
+};
 
 transcribeRouter.post('/transcribe', async (req, res) => {
   const { audioUrl, episodeId, podcastId, episodeTitle } = req.body;
@@ -27,26 +39,53 @@ transcribeRouter.post('/transcribe', async (req, res) => {
     });
   }
 
-  const tmpFile = os.tmpdir() + `/podcut-${episodeId}-${Date.now()}.mp3`;
+  let tmpFile = null;
 
   try {
-    // Download audio
-    console.log(`Downloading audio: ${audioUrl}`);
-    const audioResponse = await fetch(audioUrl);
-    if (!audioResponse.ok) throw new Error(`Failed to download audio: ${audioResponse.status}`);
+    // Download audio with User-Agent and timeout
+    console.log(`[${episodeId}] Downloading: ${audioUrl}`);
+
+    const dlController = new AbortController();
+    const dlTimeout = setTimeout(() => dlController.abort(), 5 * 60 * 1000); // 5 min download timeout
+
+    const audioResponse = await fetch(audioUrl, {
+      signal: dlController.signal,
+      headers: {
+        'User-Agent': 'PodCut/1.0 (Podcast Transcription Service)',
+      },
+      redirect: 'follow',
+    });
+    clearTimeout(dlTimeout);
+
+    if (!audioResponse.ok) {
+      throw new Error(`Download failed: HTTP ${audioResponse.status} ${audioResponse.statusText}`);
+    }
+
+    // Detect audio type from Content-Type header or URL
+    const contentType = (audioResponse.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    const urlExt = path.extname(new URL(audioUrl.split('?')[0]).pathname).toLowerCase();
+    const audioInfo = AUDIO_TYPES[contentType] || AUDIO_TYPES['audio/mpeg'];
+    const ext = audioInfo.ext || urlExt || '.mp3';
+
+    tmpFile = os.tmpdir() + `/podcut-${episodeId}-${Date.now()}${ext}`;
 
     await pipeline(audioResponse.body, createWriteStream(tmpFile));
-    console.log(`Downloaded to ${tmpFile}`);
+    const fileSize = fs.statSync(tmpFile).size;
+    console.log(`[${episodeId}] Downloaded ${(fileSize / 1024 / 1024).toFixed(1)} MB (${contentType || 'unknown type'})`);
+
+    if (fileSize < 1000) {
+      throw new Error(`Downloaded file too small (${fileSize} bytes) — may not be a valid audio file`);
+    }
 
     // Read file as buffer and send via native FormData + Blob
     const fileBuffer = fs.readFileSync(tmpFile);
-    const blob = new Blob([fileBuffer], { type: 'audio/mpeg' });
+    const blob = new Blob([fileBuffer], { type: audioInfo.mime });
     const form = new FormData();
-    form.append('file', blob, 'audio.mp3');
+    form.append('file', blob, `audio${ext}`);
 
-    console.log(`Sending to transcription server (${(fileBuffer.length / 1024 / 1024).toFixed(1)} MB)...`);
+    console.log(`[${episodeId}] Sending to GPU server...`);
 
-    // 30 minute timeout — GPU transcription can take a while, especially in a queue
+    // 30 minute timeout — GPU transcription can take a while
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30 * 60 * 1000);
 
@@ -60,7 +99,7 @@ transcribeRouter.post('/transcribe', async (req, res) => {
 
     if (!transcribeResponse.ok) {
       const errText = await transcribeResponse.text();
-      throw new Error(`Transcription failed: ${transcribeResponse.status} - ${errText}`);
+      throw new Error(`GPU server error: ${transcribeResponse.status} - ${errText}`);
     }
 
     const result = await transcribeResponse.json();
@@ -80,12 +119,15 @@ transcribeRouter.post('/transcribe', async (req, res) => {
       result.processing_time
     );
 
+    console.log(`[${episodeId}] Transcription saved (${result.duration?.toFixed(0)}s audio, ${result.processing_time?.toFixed(1)}s processing)`);
     res.json(result);
   } catch (err) {
-    console.error('Transcription error:', err);
+    console.error(`[${episodeId}] Transcription error:`, err.message);
     res.status(500).json({ error: err.message || 'Transcription failed' });
   } finally {
-    try { fs.unlinkSync(tmpFile); } catch { }
+    if (tmpFile) {
+      try { fs.unlinkSync(tmpFile); } catch { }
+    }
   }
 });
 
