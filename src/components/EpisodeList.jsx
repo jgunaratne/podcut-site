@@ -4,10 +4,9 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 function EpisodeList({ episodes, podcast, feedUrl, artworkUrl, artistName, podcastName }) {
-  const { currentEpisode, playEpisode } = usePlayer();
+  const { currentEpisode, playEpisode, startTranscription, pendingTranscriptions } = usePlayer();
   const [expandedEpisode, setExpandedEpisode] = useState(null);
   const [transcriptions, setTranscriptions] = useState({});
-  const [loadingEpisodes, setLoadingEpisodes] = useState({});
 
   const handlePlay = (episode) => {
     playEpisode(episode, podcast);
@@ -19,33 +18,22 @@ function EpisodeList({ episodes, podcast, feedUrl, artworkUrl, artistName, podca
       return;
     }
 
-    setLoadingEpisodes(prev => ({ ...prev, [episode.id]: true }));
     setExpandedEpisode(episode.id);
 
+    // Check if already transcribed
     try {
-      // Check if transcription already exists
       const checkRes = await fetch(`/api/transcriptions/${episode.id}`);
       if (checkRes.ok) {
         const data = await checkRes.json();
         setTranscriptions(prev => ({ ...prev, [episode.id]: data }));
-        setLoadingEpisodes(prev => ({ ...prev, [episode.id]: false }));
         return;
       }
+    } catch { }
 
-      // Request new transcription
-      const res = await fetch('/api/transcribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audioUrl: episode.audioUrl, episodeId: episode.id }),
-      });
-
-      if (!res.ok) throw new Error('Transcription failed');
-      const data = await res.json();
+    // Use global transcription tracker
+    const data = await startTranscription(episode, podcast);
+    if (data) {
       setTranscriptions(prev => ({ ...prev, [episode.id]: data }));
-    } catch (err) {
-      console.error('Transcription error:', err);
-    } finally {
-      setLoadingEpisodes(prev => ({ ...prev, [episode.id]: false }));
     }
   };
 
@@ -89,11 +77,11 @@ function EpisodeList({ episodes, podcast, feedUrl, artworkUrl, artistName, podca
             </div>
             <div className="episode-actions">
               <button
-                className={`transcribe-btn ${loadingEpisodes[episode.id] ? 'loading' : ''} ${transcriptions[episode.id] ? 'done' : ''}`}
+                className={`transcribe-btn ${pendingTranscriptions[episode.id] ? 'loading' : ''} ${transcriptions[episode.id] ? 'done' : ''}`}
                 onClick={() => handleTranscribe(episode)}
                 disabled={!episode.audioUrl}
               >
-                {loadingEpisodes[episode.id] ? (
+                {pendingTranscriptions[episode.id] ? (
                   <>
                     <span className="spinner spinner-sm" />
                     Transcribing…
@@ -117,7 +105,7 @@ function EpisodeList({ episodes, podcast, feedUrl, artworkUrl, artistName, podca
           {expandedEpisode === episode.id && (
             <TranscriptionPanel
               transcription={transcriptions[episode.id]}
-              loading={loadingEpisodes[episode.id]}
+              loading={pendingTranscriptions[episode.id]}
               onClose={() => setExpandedEpisode(null)}
               episode={episode}
               podcast={podcast}
