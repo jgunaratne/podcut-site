@@ -1,0 +1,37 @@
+[
+  {
+    "collectionId": 360084272,
+    "collectionName": "The Joe Rogan Experience",
+    "artistName": "Joe Rogan",
+    "artworkUrl600": "https://megaphone.imgix.net/podcasts/8e5bcebc-ca16-11ee-89f0-0fa0b9bdfc7c/image/11f568857987283428d892402e623b21.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+    "feedUrl": "https://feeds.megaphone.fm/GLT1412515089"
+  },
+  {
+    "collectionId": 1502871393,
+    "collectionName": "All-In with Chamath, Jason, Sacks & Friedberg",
+    "artistName": "All-In Podcast, LLC",
+    "artworkUrl600": "https://static.libsyn.com/p/assets/a/9/c/b/a9cb4d1dadb1ea21/all-in_logo.png",
+    "feedUrl": "https://rss.libsyn.com/shows/254861/destinations/1928300.xml"
+  },
+  {
+    "collectionId": 1434243584,
+    "collectionName": "Lex Fridman Podcast",
+    "artistName": "Lex Fridman",
+    "artworkUrl600": "https://lexfridman.com/wordpress/wp-content/uploads/powerpress/artwork_3000-230.png",
+    "feedUrl": "https://lexfridman.com/feed/podcast/"
+  },
+  {
+    "collectionId": 1744631325,
+    "collectionName": "Prof G Markets",
+    "artistName": "Vox Media Podcast Network",
+    "artworkUrl600": "https://megaphone.imgix.net/podcasts/54663ef8-fc08-11ee-a810-5fc7d9606929/image/c9ef8b6a2416931dc345f8bbf225497d.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+    "feedUrl": "https://feeds.megaphone.fm/profgmarkets"
+  },
+  {
+    "collectionId": 152016440,
+    "collectionName": "WSJ What’s News",
+    "artistName": "The Wall Street Journal",
+    "artworkUrl600": "https://megaphone.imgix.net/podcasts/7297a16a-9f81-11e5-8821-232b0d194322/image/WSJ_Podcast_Whats_News.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+    "feedUrl": "https://video-api.wsj.com/podcast/rss/wsj/whats-news"
+  }
+]
