@@ -6,7 +6,7 @@ import TranscriptionPanel from '../components/TranscriptionPanel.jsx';
 function EpisodePage() {
   const { podcastId, episodeIndex } = useParams();
   const [searchParams] = useSearchParams();
-  const { currentEpisode, playEpisode, seekTo, startTranscription } = usePlayer();
+  const { currentEpisode, playEpisode, seekTo, startTranscription, pendingTranscriptions } = usePlayer();
 
   const [podcast, setPodcast] = useState(null);
   const [episode, setEpisode] = useState(null);
@@ -219,7 +219,7 @@ function EpisodePage() {
         )}
 
         {/* Transcription */}
-        {(transcription || transcribing) && (
+        {(transcription || transcribing || (episode && pendingTranscriptions[episode.id])) && (
           <div className="episode-detail-section">
             <h3 className="episode-detail-section-title">
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
