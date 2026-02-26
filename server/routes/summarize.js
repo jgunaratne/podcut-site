@@ -11,8 +11,14 @@ const MODEL = process.env.VERTEX_MODEL || 'gemini-2.5-flash';
 const vertexAI = new VertexAI({ project: PROJECT_ID, location: LOCATION });
 const model = vertexAI.getGenerativeModel({ model: MODEL });
 
+const formatTime = (seconds) => {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+};
+
 summarizeRouter.post('/summarize', async (req, res) => {
-  const { episodeId, text } = req.body;
+  const { episodeId, text, segments } = req.body;
   if (!episodeId || !text) {
     return res.status(400).json({ error: 'episodeId and text required' });
   }
@@ -24,20 +30,30 @@ summarizeRouter.post('/summarize', async (req, res) => {
   }
 
   try {
-    const prompt = `You are a podcast summarizer. Given the following podcast episode transcript, provide a clear, well-structured summary.
+    // Build timestamped transcript from segments if available
+    let transcript;
+    if (segments && segments.length > 0) {
+      transcript = segments.map(seg => `[${formatTime(seg.start)}] ${seg.text}`).join('\n');
+    } else {
+      transcript = text.slice(0, 100000);
+    }
+
+    const prompt = `You are a podcast summarizer. Given the following timestamped podcast transcript, provide a clear, well-structured summary.
 
 Include:
 - A brief overview (2-3 sentences)
-- Key topics discussed (as bullet points)
-- Notable quotes or insights (if any)
+- Key topics discussed (as bullet points with timecodes in [M:SS] format referencing when each topic is discussed)
+- Notable quotes or insights with their timecodes
 - Key takeaways
+
+IMPORTANT: Include timecodes in [M:SS] format in your bullet points to reference when topics are discussed. Use the timestamps from the transcript. For example: "- [2:15] Discussion about machine learning techniques"
 
 Keep the summary concise but informative. Use markdown formatting.
 
-TRANSCRIPT:
-${text.slice(0, 100000)}`;
+TIMESTAMPED TRANSCRIPT:
+${transcript.slice(0, 100000)}`;
 
-    console.log(`Summarizing episode ${episodeId} (${text.length} chars)...`);
+    console.log(`Summarizing episode ${episodeId} (${transcript.length} chars)...`);
 
     const result = await model.generateContent(prompt);
     const response = result.response;

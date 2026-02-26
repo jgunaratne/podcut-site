@@ -21,7 +21,11 @@ function TranscriptionPanel({ transcription, loading, onClose, episode, podcast 
       const res = await fetch('/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ episodeId, text: transcription.text }),
+        body: JSON.stringify({
+          episodeId,
+          text: transcription.text,
+          segments: transcription.segments,
+        }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -82,12 +86,33 @@ function TranscriptionPanel({ transcription, loading, onClose, episode, podcast 
     return elements;
   };
 
+  const parseTimecode = (tc) => {
+    // Parse "M:SS" or "MM:SS" or "H:MM:SS" to seconds
+    const parts = tc.split(':').map(Number);
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return 0;
+  };
+
   const formatInline = (text) => {
-    // Bold
-    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    // Split on timecodes like [0:15] or [12:30] or [1:02:15] and bold markers
+    const parts = text.split(/(\[\d{1,2}:\d{2}(?::\d{2})?\]|\*\*[^*]+\*\*)/g);
     return parts.map((part, i) => {
       if (part.startsWith('**') && part.endsWith('**')) {
         return <strong key={i}>{part.slice(2, -2)}</strong>;
+      }
+      const tcMatch = part.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]$/);
+      if (tcMatch) {
+        const seconds = parseTimecode(tcMatch[1]);
+        return (
+          <span
+            key={i}
+            className="summary-timecode"
+            onClick={() => handleSeek(seconds)}
+          >
+            {tcMatch[1]}
+          </span>
+        );
       }
       return part;
     });
@@ -111,7 +136,16 @@ function TranscriptionPanel({ transcription, loading, onClose, episode, podcast 
     );
   }
 
-  if (!transcription) return null;
+  if (!transcription) {
+    return (
+      <div className="transcription-panel">
+        <div className="transcription-content" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+          <span className="spinner spinner-sm" style={{ marginRight: 8 }} />
+          Preparing…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="transcription-panel">
@@ -148,19 +182,7 @@ function TranscriptionPanel({ transcription, loading, onClose, episode, podcast 
             if (!summary && !summarizing) handleSummarize();
           }}
         >
-          {summarizing ? (
-            <>
-              <span className="spinner spinner-sm" style={{ width: 12, height: 12 }} />
-              Summarizing…
-            </>
-          ) : (
-            <>
-              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                <path d="M4 5h12M4 10h8M4 15h10" />
-              </svg>
-              Summarize
-            </>
-          )}
+          {summarizing ? 'Summarizing…' : 'Summarize'}
         </button>
       </div>
       <div className="transcription-content">

@@ -6,7 +6,7 @@ import TranscriptionPanel from '../components/TranscriptionPanel.jsx';
 function EpisodePage() {
   const { podcastId, episodeIndex } = useParams();
   const [searchParams] = useSearchParams();
-  const { currentEpisode, playEpisode, seekTo } = usePlayer();
+  const { currentEpisode, playEpisode, seekTo, startTranscription } = usePlayer();
 
   const [podcast, setPodcast] = useState(null);
   const [episode, setEpisode] = useState(null);
@@ -62,6 +62,7 @@ function EpisodePage() {
     if (!episode || transcription) return;
     setTranscribing(true);
     try {
+      // Check if already transcribed
       const checkRes = await fetch(`/api/transcriptions/${episode.id}`);
       if (checkRes.ok) {
         const data = await checkRes.json();
@@ -70,14 +71,9 @@ function EpisodePage() {
         return;
       }
 
-      const res = await fetch('/api/transcribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audioUrl: episode.audioUrl, episodeId: episode.id }),
-      });
-      if (!res.ok) throw new Error('Transcription failed');
-      const data = await res.json();
-      setTranscription(data);
+      // Use global transcription tracker
+      const data = await startTranscription(episode, podcast);
+      if (data) setTranscription(data);
     } catch (err) {
       console.error('Transcription error:', err);
     } finally {
@@ -91,11 +87,6 @@ function EpisodePage() {
         weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
       });
     } catch { return dateStr; }
-  };
-
-  const stripHtml = (html) => {
-    if (!html) return '';
-    return html.replace(/<[^>]*>/g, '').trim();
   };
 
   if (loading) {
@@ -129,7 +120,7 @@ function EpisodePage() {
   }
 
   const isPlaying = currentEpisode?.id === episode.id;
-  const description = stripHtml(episode.description);
+  const description = episode.description || '';
 
   return (
     <div className="page-container">
@@ -215,9 +206,10 @@ function EpisodePage() {
               </svg>
               Episode Notes
             </h3>
-            <div className={`episode-detail-description ${showFullDesc ? 'expanded' : ''}`}>
-              {description}
-            </div>
+            <div
+              className={`episode-detail-description ${showFullDesc ? 'expanded' : ''}`}
+              dangerouslySetInnerHTML={{ __html: description }}
+            />
             {description.length > 400 && (
               <button className="episode-desc-toggle" onClick={() => setShowFullDesc(!showFullDesc)}>
                 {showFullDesc ? 'Show less' : 'Show more'}
