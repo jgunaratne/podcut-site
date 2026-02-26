@@ -6,6 +6,8 @@ export const podcastRouter = Router();
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
+  processEntities: true,
+  htmlEntities: true,
 });
 
 podcastRouter.get('/:id', async (req, res) => {
