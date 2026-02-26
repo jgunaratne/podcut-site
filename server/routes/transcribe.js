@@ -7,7 +7,7 @@ import db from '../db.js';
 
 export const transcribeRouter = Router();
 
-const GPU_SERVER = process.env.GPU_SERVER || 'http://192.168.1.103';
+const GPU_SERVER = process.env.GPU_SERVER;
 
 transcribeRouter.post('/transcribe', async (req, res) => {
   const { audioUrl, episodeId, podcastId, episodeTitle } = req.body;

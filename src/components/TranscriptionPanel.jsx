@@ -4,15 +4,93 @@ import { usePlayer } from '../App.jsx';
 function TranscriptionPanel({ transcription, loading, onClose, episode, podcast }) {
   const [view, setView] = useState('segments');
   const { seekTo } = usePlayer();
+  const [summary, setSummary] = useState(null);
+  const [summarizing, setSummarizing] = useState(false);
+  const [summaryError, setSummaryError] = useState(null);
 
   const handleSeek = (time) => {
     seekTo(time, episode, podcast);
+  };
+
+  const handleSummarize = async () => {
+    if (summary || summarizing || !transcription?.text) return;
+    setSummarizing(true);
+    setSummaryError(null);
+    try {
+      const episodeId = episode?.id || 'unknown';
+      const res = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ episodeId, text: transcription.text }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Summarization failed');
+      }
+      const data = await res.json();
+      setSummary(data.summary);
+    } catch (err) {
+      console.error('Summary error:', err);
+      setSummaryError(err.message);
+    } finally {
+      setSummarizing(false);
+    }
   };
 
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Simple markdown renderer for summary
+  const renderMarkdown = (md) => {
+    if (!md) return null;
+    const lines = md.split('\n');
+    const elements = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      if (line.match(/^### /)) {
+        elements.push(<h4 key={i} className="summary-h3">{line.replace(/^### /, '')}</h4>);
+      } else if (line.match(/^## /)) {
+        elements.push(<h3 key={i} className="summary-h2">{line.replace(/^## /, '')}</h3>);
+      } else if (line.match(/^# /)) {
+        elements.push(<h2 key={i} className="summary-h1">{line.replace(/^# /, '')}</h2>);
+      } else if (line.match(/^[-*] /)) {
+        const items = [];
+        let j = i;
+        while (j < lines.length && lines[j].match(/^[-*] /)) {
+          items.push(<li key={j}>{formatInline(lines[j].replace(/^[-*] /, ''))}</li>);
+          j++;
+        }
+        elements.push(<ul key={`ul-${i}`} className="summary-list">{items}</ul>);
+        i = j - 1;
+      } else if (line.match(/^> /)) {
+        elements.push(
+          <blockquote key={i} className="summary-quote">
+            {formatInline(line.replace(/^> /, ''))}
+          </blockquote>
+        );
+      } else if (line.trim()) {
+        elements.push(<p key={i} className="summary-paragraph">{formatInline(line)}</p>);
+      }
+      i++;
+    }
+    return elements;
+  };
+
+  const formatInline = (text) => {
+    // Bold
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i}>{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
   };
 
   if (loading) {
@@ -63,6 +141,27 @@ function TranscriptionPanel({ transcription, loading, onClose, episode, podcast 
         >
           Full Text
         </button>
+        <button
+          className={`transcription-tab ${view === 'summary' ? 'active' : ''}`}
+          onClick={() => {
+            setView('summary');
+            if (!summary && !summarizing) handleSummarize();
+          }}
+        >
+          {summarizing ? (
+            <>
+              <span className="spinner spinner-sm" style={{ width: 12, height: 12 }} />
+              Summarizing…
+            </>
+          ) : (
+            <>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M4 5h12M4 10h8M4 15h10" />
+              </svg>
+              Summarize
+            </>
+          )}
+        </button>
       </div>
       <div className="transcription-content">
         {view === 'segments' && transcription.segments ? (
@@ -72,6 +171,28 @@ function TranscriptionPanel({ transcription, loading, onClose, episode, podcast 
               <span className="segment-text">{seg.text}</span>
             </div>
           ))
+        ) : view === 'summary' ? (
+          <div className="summary-content">
+            {summarizing && (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                <span className="spinner" style={{ marginBottom: 16, display: 'inline-block' }} />
+                <p>Generating summary with Gemini…</p>
+              </div>
+            )}
+            {summaryError && (
+              <div className="summary-error">
+                <p>Failed to generate summary: {summaryError}</p>
+                <button className="btn btn-sm btn-outline" onClick={() => { setSummaryError(null); handleSummarize(); }}>
+                  Retry
+                </button>
+              </div>
+            )}
+            {summary && (
+              <div className="summary-body">
+                {renderMarkdown(summary)}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="transcription-full-text">
             {transcription.text || 'No transcription text available.'}

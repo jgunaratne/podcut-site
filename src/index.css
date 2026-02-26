@@ -663,6 +663,90 @@ body {
   color: var(--text-secondary);
 }
 
+/* ── Summary Tab ── */
+.transcription-tab svg {
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+
+.summary-content {
+  animation: fadeIn 300ms ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.summary-body {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+}
+
+.summary-h1 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 12px;
+}
+
+.summary-h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 20px 0 10px;
+}
+
+.summary-h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 16px 0 8px;
+}
+
+.summary-paragraph {
+  margin: 8px 0;
+}
+
+.summary-list {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.summary-list li {
+  margin-bottom: 6px;
+  line-height: 1.6;
+}
+
+.summary-list li::marker {
+  color: var(--accent-secondary);
+}
+
+.summary-quote {
+  margin: 12px 0;
+  padding: 10px 16px;
+  border-left: 3px solid var(--accent-primary);
+  background: var(--bg-card);
+  border-radius: 0 8px 8px 0;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.summary-error {
+  text-align: center;
+  padding: 24px;
+  color: var(--danger);
+}
+
+.summary-error p {
+  margin-bottom: 12px;
+}
 /* ── Audio Player ── */
 .audio-player {
   position: fixed;

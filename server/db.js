@@ -32,8 +32,16 @@ db.exec(`
     language TEXT,
     duration REAL,
     processing_time REAL,
+    summary TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+// Migration: add summary column if it doesn't exist
+try {
+  db.prepare("SELECT summary FROM transcriptions LIMIT 1").get();
+} catch {
+  db.exec("ALTER TABLE transcriptions ADD COLUMN summary TEXT");
+}
 
 export default db;
