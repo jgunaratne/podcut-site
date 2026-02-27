@@ -1,4 +1,4 @@
-import { useState, useRef, createContext, useContext, useCallback } from 'react';
+import { useState, useRef, useEffect, createContext, useContext, useCallback } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 import AudioPlayer from './components/AudioPlayer.jsx';
@@ -19,6 +19,18 @@ function App() {
   const audioRef = useRef(null);
   const [toasts, setToasts] = useState([]);
   const [pendingTranscriptions, setPendingTranscriptions] = useState({});
+
+  // Theme management
+  const [theme, setTheme] = useState(() => localStorage.getItem('podcut-theme') || 'light');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('podcut-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  }, []);
 
   const playEpisode = (episode, podcast) => {
     setCurrentEpisode(episode);
@@ -164,6 +176,7 @@ function App() {
     <PlayerContext.Provider value={{
       currentEpisode, podcastMeta, playEpisode, seekTo, audioRef,
       addToast, startTranscription, pendingTranscriptions,
+      theme, toggleTheme,
     }}>
       <div className="app-layout">
         <Navbar />

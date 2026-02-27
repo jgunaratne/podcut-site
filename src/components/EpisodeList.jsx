@@ -7,18 +7,21 @@ function EpisodeList({ episodes, podcast, feedUrl, artworkUrl, artistName, podca
   const { currentEpisode, playEpisode, startTranscription, pendingTranscriptions } = usePlayer();
   const [expandedEpisode, setExpandedEpisode] = useState(null);
   const [transcriptions, setTranscriptions] = useState({});
+  const [failedEpisodes, setFailedEpisodes] = useState({});
 
   const handlePlay = (episode) => {
     playEpisode(episode, podcast);
   };
 
   const handleTranscribe = async (episode) => {
+    // If completed, toggle panel
     if (transcriptions[episode.id]) {
       setExpandedEpisode(expandedEpisode === episode.id ? null : episode.id);
       return;
     }
 
     setExpandedEpisode(episode.id);
+    setFailedEpisodes(prev => { const next = { ...prev }; delete next[episode.id]; return next; });
 
     // Check if already transcribed
     try {
@@ -36,6 +39,8 @@ function EpisodeList({ episodes, podcast, feedUrl, artworkUrl, artistName, podca
     const data = await startTranscription(episode, podcast);
     if (data) {
       setTranscriptions(prev => ({ ...prev, [episode.id]: data }));
+    } else {
+      setFailedEpisodes(prev => ({ ...prev, [episode.id]: true }));
     }
   };
 
@@ -79,7 +84,7 @@ function EpisodeList({ episodes, podcast, feedUrl, artworkUrl, artistName, podca
             </div>
             <div className="episode-actions">
               <button
-                className={`transcribe-btn ${pendingTranscriptions[episode.id] ? 'loading' : ''} ${transcriptions[episode.id] ? 'done' : ''}`}
+                className={`transcribe-btn ${pendingTranscriptions[episode.id] ? 'loading' : ''} ${transcriptions[episode.id] ? 'done' : ''} ${failedEpisodes[episode.id] ? 'failed' : ''}`}
                 onClick={() => handleTranscribe(episode)}
                 disabled={!episode.audioUrl}
               >
@@ -87,6 +92,13 @@ function EpisodeList({ episodes, podcast, feedUrl, artworkUrl, artistName, podca
                   <>
                     <span className="spinner spinner-sm" />
                     Transcribing…
+                  </>
+                ) : failedEpisodes[episode.id] ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="var(--danger)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M7 3v4H3" /><path d="M17 17v-4h4" /><path d="M3 7a8 8 0 0114-1" /><path d="M17 13a8 8 0 01-14 1" />
+                    </svg>
+                    Retry
                   </>
                 ) : transcriptions[episode.id] ? (
                   <>
