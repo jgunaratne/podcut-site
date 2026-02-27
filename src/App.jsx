@@ -57,7 +57,7 @@ function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  // Global transcription tracker — fires transcription and shows toast on completion
+  // Global transcription tracker — fires transcription and polls for completion
   const startTranscription = useCallback(async (episode, podcast) => {
     if (!episode?.audioUrl || !episode?.id) return;
     if (pendingTranscriptions[episode.id]) return; // already in progress
@@ -73,47 +73,76 @@ function App() {
 
     try {
       // Check if already transcribed
+      let alreadyProcessing = false;
       const checkRes = await fetch(`/api/transcriptions/${episode.id}`);
       if (checkRes.ok) {
         const data = await checkRes.json();
-        setPendingTranscriptions(prev => {
-          const next = { ...prev };
-          delete next[episode.id];
-          return next;
-        });
-        addToast({
-          type: 'success',
-          title: 'Transcription ready',
-          message: episode.title,
-        });
-        return data;
+        if (data.status === 'completed') {
+          setPendingTranscriptions(prev => {
+            const next = { ...prev };
+            delete next[episode.id];
+            return next;
+          });
+          addToast({
+            type: 'success',
+            title: 'Transcription ready',
+            message: episode.title,
+          });
+          return data;
+        }
+        if (data.status === 'processing') {
+          alreadyProcessing = true;
+        }
+        // If failed, delete so we can retry
+        if (data.status === 'failed') {
+          await fetch(`/api/transcriptions/${episode.id}`, { method: 'DELETE' });
+        }
       }
 
-      // Request new transcription
-      const res = await fetch('/api/transcribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          audioUrl: episode.audioUrl,
-          episodeId: episode.id,
-          podcastId: podcast?.collectionId,
-          episodeTitle: episode.title,
-        }),
-      });
+      // Fire off transcription request (returns 202 immediately)
+      if (!alreadyProcessing) {
+        const res = await fetch('/api/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audioUrl: episode.audioUrl,
+            episodeId: episode.id,
+            podcastId: podcast?.collectionId,
+            episodeTitle: episode.title,
+          }),
+        });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Transcription failed');
+        if (!res.ok && res.status !== 202) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Transcription failed');
+        }
+
+        // If completed immediately (cached result)
+        if (res.status === 200) {
+          const data = await res.json();
+          addToast({ type: 'success', title: 'Transcription complete', message: episode.title });
+          return data;
+        }
       }
-      const data = await res.json();
 
-      addToast({
-        type: 'success',
-        title: 'Transcription complete',
-        message: episode.title,
-      });
+      // Poll for result every 5 seconds, up to 35 minutes
+      const maxPolls = (35 * 60) / 5;
+      for (let i = 0; i < maxPolls; i++) {
+        await new Promise(r => setTimeout(r, 5000));
+        const pollRes = await fetch(`/api/transcriptions/${episode.id}`);
+        if (!pollRes.ok) continue;
+        const data = await pollRes.json();
 
-      return data;
+        if (data.status === 'completed') {
+          addToast({ type: 'success', title: 'Transcription complete', message: episode.title });
+          return data;
+        }
+        if (data.status === 'failed') {
+          throw new Error(data.error || 'Transcription failed on server');
+        }
+        // status === 'processing' → keep polling
+      }
+      throw new Error('Transcription timed out');
     } catch (err) {
       console.error('Transcription error:', err);
       addToast({

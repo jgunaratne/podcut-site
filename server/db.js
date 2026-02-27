@@ -44,4 +44,12 @@ try {
   db.exec("ALTER TABLE transcriptions ADD COLUMN summary TEXT");
 }
 
+// Migration: add status and error columns for async transcription
+try {
+  db.prepare("SELECT status FROM transcriptions LIMIT 1").get();
+} catch {
+  db.exec("ALTER TABLE transcriptions ADD COLUMN status TEXT DEFAULT 'completed'");
+  db.exec("ALTER TABLE transcriptions ADD COLUMN error TEXT");
+}
+
 export default db;

@@ -21,24 +21,8 @@ const AUDIO_TYPES = {
   'audio/wav': { ext: '.wav', mime: 'audio/wav' },
 };
 
-transcribeRouter.post('/transcribe', async (req, res) => {
-  const { audioUrl, episodeId, podcastId, episodeTitle } = req.body;
-  if (!audioUrl || !episodeId) {
-    return res.status(400).json({ error: 'audioUrl and episodeId required' });
-  }
-
-  // Check if transcription already exists in DB
-  const existing = db.prepare('SELECT * FROM transcriptions WHERE episode_id = ?').get(episodeId);
-  if (existing) {
-    return res.json({
-      text: existing.text,
-      segments: JSON.parse(existing.segments || '[]'),
-      language: existing.language,
-      duration: existing.duration,
-      processing_time: existing.processing_time,
-    });
-  }
-
+// Background transcription processor — fire and forget
+async function processTranscription(audioUrl, episodeId, podcastId, episodeTitle) {
   let tmpFile = null;
 
   try {
@@ -104,31 +88,70 @@ transcribeRouter.post('/transcribe', async (req, res) => {
 
     const result = await transcribeResponse.json();
 
-    // Save transcription to SQLite
+    // Update row to completed with results
     db.prepare(`
-      INSERT OR REPLACE INTO transcriptions (episode_id, podcast_id, episode_title, text, segments, language, duration, processing_time)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      UPDATE transcriptions
+      SET text = ?, segments = ?, language = ?, duration = ?, processing_time = ?, status = 'completed', error = NULL
+      WHERE episode_id = ?
     `).run(
-      episodeId,
-      podcastId || null,
-      episodeTitle || null,
       result.text,
       JSON.stringify(result.segments || []),
       result.language,
       result.duration,
-      result.processing_time
+      result.processing_time,
+      episodeId
     );
 
     console.log(`[${episodeId}] Transcription saved (${result.duration?.toFixed(0)}s audio, ${result.processing_time?.toFixed(1)}s processing)`);
-    res.json(result);
   } catch (err) {
     console.error(`[${episodeId}] Transcription error:`, err.message);
-    res.status(500).json({ error: err.message || 'Transcription failed' });
+    // Update row to failed with error message
+    db.prepare(`
+      UPDATE transcriptions SET status = 'failed', error = ? WHERE episode_id = ?
+    `).run(err.message || 'Transcription failed', episodeId);
   } finally {
     if (tmpFile) {
       try { fs.unlinkSync(tmpFile); } catch { }
     }
   }
+}
+
+transcribeRouter.post('/transcribe', async (req, res) => {
+  const { audioUrl, episodeId, podcastId, episodeTitle } = req.body;
+  if (!audioUrl || !episodeId) {
+    return res.status(400).json({ error: 'audioUrl and episodeId required' });
+  }
+
+  // Check if transcription already exists in DB
+  const existing = db.prepare('SELECT * FROM transcriptions WHERE episode_id = ?').get(episodeId);
+  if (existing) {
+    if (existing.status === 'completed') {
+      return res.json({
+        status: 'completed',
+        text: existing.text,
+        segments: JSON.parse(existing.segments || '[]'),
+        language: existing.language,
+        duration: existing.duration,
+        processing_time: existing.processing_time,
+      });
+    }
+    if (existing.status === 'processing') {
+      return res.status(202).json({ status: 'processing', episodeId });
+    }
+    // If failed, delete old row so we can retry
+    db.prepare('DELETE FROM transcriptions WHERE episode_id = ?').run(episodeId);
+  }
+
+  // Insert a processing placeholder row
+  db.prepare(`
+    INSERT INTO transcriptions (episode_id, podcast_id, episode_title, status)
+    VALUES (?, ?, ?, 'processing')
+  `).run(episodeId, podcastId || null, episodeTitle || null);
+
+  // Fire and forget — process in background
+  processTranscription(audioUrl, episodeId, podcastId, episodeTitle);
+
+  res.status(202).json({ status: 'processing', episodeId });
 });
 
 transcribeRouter.get('/transcriptions/:episodeId', (req, res) => {
@@ -136,11 +159,26 @@ transcribeRouter.get('/transcriptions/:episodeId', (req, res) => {
   if (!row) {
     return res.status(404).json({ error: 'No transcription found' });
   }
+
+  if (row.status === 'processing') {
+    return res.json({ status: 'processing' });
+  }
+
+  if (row.status === 'failed') {
+    return res.json({ status: 'failed', error: row.error });
+  }
+
   res.json({
+    status: 'completed',
     text: row.text,
     segments: JSON.parse(row.segments || '[]'),
     language: row.language,
     duration: row.duration,
     processing_time: row.processing_time,
   });
+});
+
+transcribeRouter.delete('/transcriptions/:episodeId', (req, res) => {
+  db.prepare('DELETE FROM transcriptions WHERE episode_id = ?').run(req.params.episodeId);
+  res.json({ ok: true });
 });
