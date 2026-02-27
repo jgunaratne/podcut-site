@@ -9,6 +9,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
+        timeout: 35 * 60 * 1000, // 35 min — GPU transcription can take up to 30 min
       },
     },
   },

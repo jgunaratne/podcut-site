@@ -101,7 +101,10 @@ function App() {
         }),
       });
 
-      if (!res.ok) throw new Error('Transcription failed');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Transcription failed');
+      }
       const data = await res.json();
 
       addToast({
@@ -116,7 +119,7 @@ function App() {
       addToast({
         type: 'error',
         title: 'Transcription failed',
-        message: episode.title,
+        message: `${episode.title} — ${err.message}`,
       });
       return null;
     } finally {
