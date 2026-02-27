@@ -1,6 +1,9 @@
 import { NavLink } from 'react-router-dom';
+import { usePlayer } from '../App.jsx';
 
 function Navbar() {
+  const { theme, toggleTheme } = usePlayer();
+
   return (
     <nav className="navbar">
       <NavLink to="/" className="navbar-brand">
@@ -31,9 +34,22 @@ function Navbar() {
           </svg>
           Favorites
         </NavLink>
+        <button className="nav-link theme-toggle" onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+          {theme === 'dark' ? (
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="10" cy="10" r="4" />
+              <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.93 4.93l1.41 1.41M13.66 13.66l1.41 1.41M4.93 15.07l1.41-1.41M13.66 6.34l1.41-1.41" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 11.5A7.5 7.5 0 118.5 3a5.5 5.5 0 008.5 8.5z" />
+            </svg>
+          )}
+        </button>
       </div>
     </nav>
   );
 }
 
 export default Navbar;
+

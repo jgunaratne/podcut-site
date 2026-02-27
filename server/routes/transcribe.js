@@ -30,7 +30,7 @@ async function processTranscription(audioUrl, episodeId, podcastId, episodeTitle
     console.log(`[${episodeId}] Downloading: ${audioUrl}`);
 
     const dlController = new AbortController();
-    const dlTimeout = setTimeout(() => dlController.abort(), 5 * 60 * 1000); // 5 min download timeout
+    const dlTimeout = setTimeout(() => dlController.abort(), 15 * 60 * 1000); // 15 min download timeout
 
     const audioResponse = await fetch(audioUrl, {
       signal: dlController.signal,
@@ -39,9 +39,9 @@ async function processTranscription(audioUrl, episodeId, podcastId, episodeTitle
       },
       redirect: 'follow',
     });
-    clearTimeout(dlTimeout);
 
     if (!audioResponse.ok) {
+      clearTimeout(dlTimeout);
       throw new Error(`Download failed: HTTP ${audioResponse.status} ${audioResponse.statusText}`);
     }
 
@@ -53,7 +53,10 @@ async function processTranscription(audioUrl, episodeId, podcastId, episodeTitle
 
     tmpFile = os.tmpdir() + `/podcut-${episodeId}-${Date.now()}${ext}`;
 
+    // Stream download to disk — timeout covers the entire download, not just headers
     await pipeline(audioResponse.body, createWriteStream(tmpFile));
+    clearTimeout(dlTimeout);
+
     const fileSize = fs.statSync(tmpFile).size;
     console.log(`[${episodeId}] Downloaded ${(fileSize / 1024 / 1024).toFixed(1)} MB (${contentType || 'unknown type'})`);
 
@@ -61,11 +64,10 @@ async function processTranscription(audioUrl, episodeId, podcastId, episodeTitle
       throw new Error(`Downloaded file too small (${fileSize} bytes) — may not be a valid audio file`);
     }
 
-    // Read file as buffer and send via native FormData + Blob
-    const fileBuffer = fs.readFileSync(tmpFile);
-    const blob = new Blob([fileBuffer], { type: audioInfo.mime });
+    // Stream file to GPU server without reading entire file into memory
+    const fileBlob = await fs.openAsBlob(tmpFile, { type: audioInfo.mime });
     const form = new FormData();
-    form.append('file', blob, `audio${ext}`);
+    form.append('file', fileBlob, `audio${ext}`);
 
     console.log(`[${episodeId}] Sending to GPU server...`);
 

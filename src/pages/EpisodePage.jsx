@@ -35,12 +35,13 @@ function EpisodePage() {
         if (data.episodes && data.episodes[idx]) {
           setEpisode(data.episodes[idx]);
 
-          // Check for existing transcription
           try {
             const tRes = await fetch(`/api/transcriptions/${data.episodes[idx].id}`);
             if (tRes.ok) {
               const tData = await tRes.json();
-              setTranscription(tData);
+              if (tData.status === 'completed' || tData.status === 'failed') {
+                setTranscription(tData);
+              }
             }
           } catch { }
         }
@@ -59,8 +60,10 @@ function EpisodePage() {
   };
 
   const handleTranscribe = async () => {
-    if (!episode || transcription) return;
+    if (!episode) return;
+    if (transcription && transcription.status === 'completed') return;
     setTranscribing(true);
+    setTranscription(null);
     try {
       // Check if already transcribed
       const checkRes = await fetch(`/api/transcriptions/${episode.id}`);
@@ -174,14 +177,21 @@ function EpisodePage() {
               <button
                 className={`btn ${transcription ? 'btn-outline done' : transcribing ? 'btn-outline' : 'btn-outline'}`}
                 onClick={handleTranscribe}
-                disabled={!episode.audioUrl || transcribing}
+                disabled={!episode.audioUrl || transcribing || transcription?.status === 'completed'}
               >
                 {transcribing ? (
                   <>
                     <span className="spinner spinner-sm" />
                     Transcribing…
                   </>
-                ) : transcription ? (
+                ) : transcription?.status === 'failed' ? (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="var(--danger)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M7 3v4H3" /><path d="M17 17v-4h4" /><path d="M3 7a8 8 0 0114-1" /><path d="M17 13a8 8 0 01-14 1" />
+                    </svg>
+                    Retry Transcription
+                  </>
+                ) : transcription?.status === 'completed' ? (
                   <>
                     <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="var(--accent-secondary)" strokeWidth="2" strokeLinecap="round"><path d="M4 10l4 4 8-8" /></svg>
                     Transcribed
