@@ -64,8 +64,10 @@ async function processTranscription(audioUrl, episodeId, podcastId, episodeTitle
       throw new Error(`Downloaded file too small (${fileSize} bytes) — may not be a valid audio file`);
     }
 
-    // Stream file to GPU server without reading entire file into memory
-    const fileBlob = await fs.openAsBlob(tmpFile, { type: audioInfo.mime });
+    // Use openAsBlob (zero-copy) if available, otherwise fall back to readFileSync
+    const fileBlob = fs.openAsBlob
+      ? await fs.openAsBlob(tmpFile, { type: audioInfo.mime })
+      : new Blob([fs.readFileSync(tmpFile)], { type: audioInfo.mime });
     const form = new FormData();
     form.append('file', fileBlob, `audio${ext}`);
 
