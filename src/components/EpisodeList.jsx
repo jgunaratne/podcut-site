@@ -25,8 +25,10 @@ function EpisodeList({ episodes, podcast, feedUrl, artworkUrl, artistName, podca
       const checkRes = await fetch(`/api/transcriptions/${episode.id}`);
       if (checkRes.ok) {
         const data = await checkRes.json();
-        setTranscriptions(prev => ({ ...prev, [episode.id]: data }));
-        return;
+        if (data.status === 'completed') {
+          setTranscriptions(prev => ({ ...prev, [episode.id]: data }));
+          return;
+        }
       }
     } catch { }
 

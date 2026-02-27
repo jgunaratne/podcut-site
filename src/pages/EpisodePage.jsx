@@ -66,9 +66,11 @@ function EpisodePage() {
       const checkRes = await fetch(`/api/transcriptions/${episode.id}`);
       if (checkRes.ok) {
         const data = await checkRes.json();
-        setTranscription(data);
-        setTranscribing(false);
-        return;
+        if (data.status === 'completed') {
+          setTranscription(data);
+          setTranscribing(false);
+          return;
+        }
       }
 
       // Use global transcription tracker
