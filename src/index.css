@@ -791,6 +791,33 @@ body {
 .summary-error p {
   margin-bottom: 12px;
 }
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all var(--transition-fast);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.refresh-btn:hover {
+  color: var(--accent-primary);
+  background: rgba(124, 92, 252, 0.1);
+}
+
+.summary-refresh-btn {
+  float: right;
+  padding: 4px 10px;
+  border: 1px solid var(--bg-glass-border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
 .summary-timecode {
   display: inline-block;
   font-size: 12px;

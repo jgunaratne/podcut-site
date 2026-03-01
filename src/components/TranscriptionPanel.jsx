@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { usePlayer } from '../App.jsx';
 
-function TranscriptionPanel({ transcription, loading, onClose, episode, podcast }) {
+function TranscriptionPanel({ transcription, loading, onClose, episode, podcast, onRefreshTranscription }) {
   const [view, setView] = useState('segments');
   const { seekTo } = usePlayer();
   const [summary, setSummary] = useState(null);
@@ -12,8 +12,8 @@ function TranscriptionPanel({ transcription, loading, onClose, episode, podcast 
     seekTo(time, episode, podcast);
   };
 
-  const handleSummarize = async () => {
-    if (summary || summarizing || !transcription?.text) return;
+  const handleSummarize = async (force = false) => {
+    if ((!force && summary) || summarizing || !transcription?.text) return;
     setSummarizing(true);
     setSummaryError(null);
     try {
@@ -25,6 +25,7 @@ function TranscriptionPanel({ transcription, loading, onClose, episode, podcast 
           episodeId,
           text: transcription.text,
           segments: transcription.segments,
+          force,
         }),
       });
       if (!res.ok) {
@@ -155,6 +156,14 @@ function TranscriptionPanel({ transcription, loading, onClose, episode, podcast 
             <path d="M3 5h14M3 10h10M3 15h12" />
           </svg>
           Transcription
+          {onRefreshTranscription && (
+            <button className="refresh-btn" onClick={onRefreshTranscription} title="Regenerate transcription">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.65 6.35A7.96 7.96 0 0010 2a8 8 0 108 8" />
+                <path d="M18 2v5h-5" />
+              </svg>
+            </button>
+          )}
         </h4>
         <span className="meta">
           {transcription.language && `Language: ${transcription.language}`}
@@ -211,6 +220,13 @@ function TranscriptionPanel({ transcription, loading, onClose, episode, podcast 
             )}
             {summary && (
               <div className="summary-body">
+                  <button className="refresh-btn summary-refresh-btn" onClick={() => handleSummarize(true)} title="Regenerate summary">
+                    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.65 6.35A7.96 7.96 0 0010 2a8 8 0 108 8" />
+                      <path d="M18 2v5h-5" />
+                    </svg>
+                    Refresh
+                  </button>
                 {renderMarkdown(summary)}
               </div>
             )}

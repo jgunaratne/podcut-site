@@ -18,15 +18,17 @@ const formatTime = (seconds) => {
 };
 
 summarizeRouter.post('/summarize', async (req, res) => {
-  const { episodeId, text, segments } = req.body;
+  const { episodeId, text, segments, force } = req.body;
   if (!episodeId || !text) {
     return res.status(400).json({ error: 'episodeId and text required' });
   }
 
-  // Check if summary already exists
-  const existing = db.prepare('SELECT summary FROM transcriptions WHERE episode_id = ?').get(episodeId);
-  if (existing?.summary) {
-    return res.json({ summary: existing.summary });
+  // Check if summary already exists (skip if force regeneration)
+  if (!force) {
+    const existing = db.prepare('SELECT summary FROM transcriptions WHERE episode_id = ?').get(episodeId);
+    if (existing?.summary) {
+      return res.json({ summary: existing.summary });
+    }
   }
 
   try {

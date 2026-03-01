@@ -44,6 +44,21 @@ function EpisodeList({ episodes, podcast, feedUrl, artworkUrl, artistName, podca
     }
   };
 
+  const handleRefreshTranscription = async (episode) => {
+    // Delete existing transcription and re-fire
+    try {
+      await fetch(`/api/transcriptions/${episode.id}`, { method: 'DELETE' });
+    } catch { }
+    setTranscriptions(prev => { const next = { ...prev }; delete next[episode.id]; return next; });
+    setFailedEpisodes(prev => { const next = { ...prev }; delete next[episode.id]; return next; });
+    const data = await startTranscription(episode, podcast);
+    if (data) {
+      setTranscriptions(prev => ({ ...prev, [episode.id]: data }));
+    } else {
+      setFailedEpisodes(prev => ({ ...prev, [episode.id]: true }));
+    }
+  };
+
   const formatDate = (dateStr) => {
     try {
       return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -72,7 +87,7 @@ function EpisodeList({ episodes, podcast, feedUrl, artworkUrl, artistName, podca
             </button>
             <div className="episode-info">
               <Link
-                to={`/podcast/${podcast.collectionId}/episode/${index}?feedUrl=${encodeURIComponent(feedUrl || '')}&art=${encodeURIComponent(artworkUrl || podcast.image || '')}&artist=${encodeURIComponent(artistName || podcast.author || '')}&name=${encodeURIComponent(podcastName || podcast.title || '')}`}
+                to={`/podcast/${podcast.collectionId}/episode/${episode.id}?feedUrl=${encodeURIComponent(feedUrl || '')}&art=${encodeURIComponent(artworkUrl || podcast.image || '')}&artist=${encodeURIComponent(artistName || podcast.author || '')}&name=${encodeURIComponent(podcastName || podcast.title || '')}`}
                 className="episode-title episode-title-link"
               >
                 {episode.title}
@@ -106,12 +121,7 @@ function EpisodeList({ episodes, podcast, feedUrl, artworkUrl, artistName, podca
                     View
                   </>
                 ) : (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M7 3v4H3" /><path d="M17 17v-4h4" /><path d="M3 7a8 8 0 0114-1" /><path d="M17 13a8 8 0 01-14 1" />
-                    </svg>
-                    Transcribe
-                  </>
+                        'Transcribe'
                 )}
               </button>
             </div>
@@ -123,6 +133,7 @@ function EpisodeList({ episodes, podcast, feedUrl, artworkUrl, artistName, podca
               onClose={() => setExpandedEpisode(null)}
               episode={episode}
               podcast={podcast}
+              onRefreshTranscription={() => handleRefreshTranscription(episode)}
             />
           )}
         </div>
