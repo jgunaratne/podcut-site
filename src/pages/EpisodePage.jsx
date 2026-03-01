@@ -4,7 +4,7 @@ import { usePlayer } from '../App.jsx';
 import TranscriptionPanel from '../components/TranscriptionPanel.jsx';
 
 function EpisodePage() {
-  const { podcastId, episodeIndex } = useParams();
+  const { podcastId, episodeId } = useParams();
   const [searchParams] = useSearchParams();
   const { currentEpisode, playEpisode, seekTo, startTranscription, pendingTranscriptions } = usePlayer();
 
@@ -31,12 +31,12 @@ function EpisodePage() {
         if (!data.title && podcastName) data.title = podcastName;
         setPodcast(data);
 
-        const idx = parseInt(episodeIndex);
-        if (data.episodes && data.episodes[idx]) {
-          setEpisode(data.episodes[idx]);
+        const ep = data.episodes?.find(e => e.id === episodeId);
+        if (ep) {
+          setEpisode(ep);
 
           try {
-            const tRes = await fetch(`/api/transcriptions/${data.episodes[idx].id}`);
+            const tRes = await fetch(`/api/transcriptions/${ep.id}`);
             if (tRes.ok) {
               const tData = await tRes.json();
               if (tData.status === 'completed' || tData.status === 'failed') {
@@ -53,7 +53,7 @@ function EpisodePage() {
     };
 
     if (feedUrl) fetchData();
-  }, [podcastId, episodeIndex, feedUrl]);
+  }, [podcastId, episodeId, feedUrl]);
 
   const handlePlay = () => {
     if (episode && podcast) playEpisode(episode, podcast);
@@ -81,6 +81,24 @@ function EpisodePage() {
       if (data) setTranscription(data);
     } catch (err) {
       console.error('Transcription error:', err);
+    } finally {
+      setTranscribing(false);
+    }
+  };
+
+  const handleRefreshTranscription = async () => {
+    if (!episode) return;
+    // Delete existing transcription and re-fire
+    try {
+      await fetch(`/api/transcriptions/${episode.id}`, { method: 'DELETE' });
+    } catch { }
+    setTranscription(null);
+    setTranscribing(true);
+    try {
+      const data = await startTranscription(episode, podcast);
+      if (data) setTranscription(data);
+    } catch (err) {
+      console.error('Refresh transcription error:', err);
     } finally {
       setTranscribing(false);
     }
@@ -197,12 +215,7 @@ function EpisodePage() {
                     Transcribed
                   </>
                 ) : (
-                  <>
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M7 3v4H3" /><path d="M17 17v-4h4" /><path d="M3 7a8 8 0 0114-1" /><path d="M17 13a8 8 0 01-14 1" />
-                    </svg>
-                    Transcribe
-                  </>
+                        'Transcribe'
                 )}
               </button>
             </div>
@@ -245,6 +258,7 @@ function EpisodePage() {
               onClose={() => { }}
               episode={episode}
               podcast={podcast}
+              onRefreshTranscription={handleRefreshTranscription}
             />
           </div>
         )}

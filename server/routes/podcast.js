@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { XMLParser } from 'fast-xml-parser';
+import crypto from 'crypto';
 
 export const podcastRouter = Router();
 
@@ -26,8 +27,12 @@ podcastRouter.get('/:id', async (req, res) => {
 
     const episodes = items.map((item, index) => {
       const enclosure = item.enclosure || {};
+      // Build a stable ID from RSS guid, falling back to title+date+url
+      const guid = item.guid?.['#text'] || item.guid || '';
+      const raw = guid || `${item.title || ''}|${item.pubDate || ''}|${enclosure['@_url'] || ''}`;
+      const hash = crypto.createHash('sha256').update(raw).digest('hex').slice(0, 12);
       return {
-        id: `${req.params.id}-${index}`,
+        id: `${req.params.id}-${hash}`,
         title: item.title || 'Untitled',
         description: item.description || item['itunes:summary'] || '',
         pubDate: item.pubDate || '',

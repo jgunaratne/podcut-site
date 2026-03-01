@@ -184,7 +184,7 @@ function App() {
           <Routes>
             <Route path="/" element={<SearchPage />} />
             <Route path="/podcast/:id" element={<PodcastPage />} />
-            <Route path="/podcast/:podcastId/episode/:episodeIndex" element={<EpisodePage />} />
+            <Route path="/podcast/:podcastId/episode/:episodeId" element={<EpisodePage />} />
             <Route path="/favorites" element={<FavoritesPage />} />
           </Routes>
         </main>
